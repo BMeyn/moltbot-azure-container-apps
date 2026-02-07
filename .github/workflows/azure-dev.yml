@@ -1,0 +1,137 @@
+# This workflow will provision and deploy the MoltBot application to Azure Container Apps
+# using Azure Developer CLI (azd).
+#
+# To configure this workflow:
+#
+# 1. Create a service principal with Contributor permissions on your Azure subscription:
+#    az ad sp create-for-rbac --name "github-moltbot-deploy" --role contributor \
+#      --scopes /subscriptions/<subscription-id> --sdk-auth
+#
+# 2. Set up the following GitHub secrets in your repository:
+#    - AZURE_CREDENTIALS: The JSON output from the service principal creation
+#    - AZURE_ENV_NAME: The environment name for your deployment (e.g., "prod")
+#    - AZURE_LOCATION: The Azure region to deploy to (e.g., "eastus2")
+#    - AZURE_SUBSCRIPTION_ID: Your Azure subscription ID
+#
+# 3. Set up the following GitHub secrets for your application configuration:
+#    - OPENROUTER_API_KEY: Your OpenRouter API key
+#    - DISCORD_BOT_TOKEN: Your Discord bot token
+#    - DISCORD_ALLOWED_USERS: Comma-separated list of Discord user IDs
+#
+# 4. Optional secrets for additional configuration:
+#    - MOLTBOT_MODEL: Model to use (default: openrouter/anthropic/claude-3.5-sonnet)
+#    - MOLTBOT_PERSONA_NAME: Bot persona name (default: Clawd)
+#    - ALLOWED_IP_RANGES: Comma-separated CIDR blocks for IP restrictions
+#    - ALERT_EMAIL_ADDRESS: Email for security alerts
+#
+# For more information see:
+# - Azure Developer CLI: https://learn.microsoft.com/azure/developer/azure-developer-cli/
+# - GitHub Actions for Azure: https://github.com/Azure/actions
+
+name: Deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_ENV_NAME: ${{ secrets.AZURE_ENV_NAME }}
+      AZURE_LOCATION: ${{ secrets.AZURE_LOCATION }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Azure Developer CLI
+        uses: Azure/setup-azd@v1.0.0
+
+      - name: Log in with Azure (Federated Credentials)
+        if: ${{ env.AZURE_CLIENT_ID != '' }}
+        run: |
+          azd auth login \
+            --client-id "${{ secrets.AZURE_CLIENT_ID }}" \
+            --federated-credential-provider "github" \
+            --tenant-id "${{ secrets.AZURE_TENANT_ID }}"
+
+      - name: Log in with Azure (Client Credentials)
+        if: ${{ env.AZURE_CLIENT_ID == '' }}
+        run: |
+          $info = $Env:AZURE_CREDENTIALS | ConvertFrom-Json -AsHashtable;
+          Write-Host "::add-mask::$($info.clientSecret)"
+
+          azd auth login `
+            --client-id "$($info.clientId)" `
+            --client-secret "$($info.clientSecret)" `
+            --tenant-id "$($info.tenantId)"
+        shell: pwsh
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Configure azd environment
+        run: |
+          # Set required environment variables
+          azd env set OPENROUTER_API_KEY "${{ secrets.OPENROUTER_API_KEY }}"
+          azd env set DISCORD_BOT_TOKEN "${{ secrets.DISCORD_BOT_TOKEN }}"
+          azd env set DISCORD_ALLOWED_USERS "${{ secrets.DISCORD_ALLOWED_USERS }}"
+          
+          # Set optional environment variables if provided
+          if [ -n "${{ secrets.MOLTBOT_MODEL }}" ]; then
+            azd env set CLAWDBOT_MODEL "${{ secrets.MOLTBOT_MODEL }}"
+          fi
+          
+          if [ -n "${{ secrets.MOLTBOT_PERSONA_NAME }}" ]; then
+            azd env set CLAWDBOT_PERSONA_NAME "${{ secrets.MOLTBOT_PERSONA_NAME }}"
+          fi
+          
+          if [ -n "${{ secrets.ALLOWED_IP_RANGES }}" ]; then
+            azd env set ALLOWED_IP_RANGES "${{ secrets.ALLOWED_IP_RANGES }}"
+          fi
+          
+          if [ -n "${{ secrets.ALERT_EMAIL_ADDRESS }}" ]; then
+            azd env set ALERT_EMAIL_ADDRESS "${{ secrets.ALERT_EMAIL_ADDRESS }}"
+          fi
+
+      - name: Provision infrastructure
+        run: azd provision --no-prompt
+
+      - name: Deploy application
+        run: azd deploy --no-prompt
+
+      - name: Get deployment outputs
+        id: outputs
+        run: |
+          # Get the container app URL
+          APP_URL=$(azd env get-values | grep CONTAINER_APP_URL | cut -d'=' -f2)
+          echo "app_url=$APP_URL" >> $GITHUB_OUTPUT
+
+      - name: Deployment summary
+        run: |
+          echo "## Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ env.AZURE_ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Location**: ${{ env.AZURE_LOCATION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Subscription**: ${{ env.AZURE_SUBSCRIPTION_ID }}" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.outputs.outputs.app_url }}" ]; then
+            echo "- **App URL**: ${{ steps.outputs.outputs.app_url }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Invite your Discord bot to a server using the OAuth2 URL" >> $GITHUB_STEP_SUMMARY
+          echo "2. Send a DM to the bot to test it" >> $GITHUB_STEP_SUMMARY
+          echo "3. Check the logs in Azure Portal for any issues" >> $GITHUB_STEP_SUMMARY

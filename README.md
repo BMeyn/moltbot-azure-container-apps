@@ -36,6 +36,13 @@ Deploy your personal AI assistant to Azure Container Apps with Discord integrati
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## Deployment Options
+
+You can deploy MoltBot to Azure in two ways:
+
+1. **[GitHub Actions (Automated CI/CD)](.github/workflows/DEPLOYMENT_GUIDE.md)** - Recommended for automated deployments
+2. **Azure Developer CLI (Manual)** - Quick local deployment (instructions below)
+
 ## Prerequisites
 
 - ✅ Azure subscription with Contributor access
