@@ -296,7 +296,7 @@ To deploy without public ingress:
 For issues with:
 - **GitHub Actions workflow**: Check this guide and workflow logs
 - **Azure deployment**: Check [Azure Developer CLI docs](https://learn.microsoft.com/azure/developer/azure-developer-cli/)
-- **MoltBot application**: Check [MoltBot documentation](https://docs.molt.bot)
+- **MoltBot application**: Check [MoltBot GitHub repository](https://github.com/moltbot/moltbot)
 
 ## Next Steps
 
