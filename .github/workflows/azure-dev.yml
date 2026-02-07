@@ -91,11 +91,11 @@ jobs:
           
           # Set optional environment variables if provided
           if [ -n "${{ secrets.MOLTBOT_MODEL }}" ]; then
-            azd env set MOLTBOT_MODEL "${{ secrets.MOLTBOT_MODEL }}"
+            azd env set CLAWDBOT_MODEL "${{ secrets.MOLTBOT_MODEL }}"
           fi
           
           if [ -n "${{ secrets.MOLTBOT_PERSONA_NAME }}" ]; then
-            azd env set MOLTBOT_PERSONA_NAME "${{ secrets.MOLTBOT_PERSONA_NAME }}"
+            azd env set CLAWDBOT_PERSONA_NAME "${{ secrets.MOLTBOT_PERSONA_NAME }}"
           fi
           
           if [ -n "${{ secrets.ALLOWED_IP_RANGES }}" ]; then
